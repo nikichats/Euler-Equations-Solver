@@ -1,0 +1,7 @@
+*.pyc
+.cache
+.idea
+__pycache__
+*.pptx
+Meetings
+
