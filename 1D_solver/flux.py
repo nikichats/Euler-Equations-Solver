@@ -17,3 +17,5 @@ def Gdnv(gamma, P):
     F2 = P[1, :]*(0.5*P[0, :]*P[1, :]**2 + (gamma/(gamma-1))*P[2, :])
     F = np.array([F0, F1, F2])
     return F
+
+
