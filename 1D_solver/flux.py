@@ -1,21 +1,25 @@
 import numpy as np
-import math as m
-import copy
 
-def LF(gamma, P):
-    """ Returns fluxes for Lax Friedrich scheme (input is primitive variables)"""
-    F0 = P[0, :]*P[1, :]
-    F1 = P[0, :]*P[1, :]**2 + P[2, :]
-    F2 = P[1, :]*(0.5*P[0, :]*P[1, :]**2 + (gamma/(gamma-1))*P[2, :])
-    F = np.array([F0, F1, F2])
-    return F
+def LaxF(U, U_prim, nx, gamma, dt, dx):
+    F = np.zeros(U_prim.shape)
+    U_next = np.zeros(U_prim.shape)
+    F[0, :] = U_prim[0, :]*U_prim[1, :]
+    F[1, :] = U_prim[0, :]*U_prim[1, :]**2 + U_prim[2, :]
+    F[2, :] = U_prim[1, :]*(0.5*U_prim[0, :]*U_prim[1, :]**2 + gamma/(gamma-1)*U_prim[2, :])
 
-def Gdnv(gamma, P):
-    """ Returns fluxes for Godunov scheme """
-    F0 = P[0, :]*P[1, :]
-    F1 = P[0, :]*P[1, :]**2 + P[2, :]
-    F2 = P[1, :]*(0.5*P[0, :]*P[1, :]**2 + (gamma/(gamma-1))*P[2, :])
-    F = np.array([F0, F1, F2])
-    return F
+    for i in range(1, nx-1):
+        U_next[:, i] = 0.5*(U[:, i-1] + U[:, i+1]) - 0.5*dt/dx*(F[:, i+1] - F[:, i-1])
 
+    return U_next
 
+def Godunov(U, U_prim, nx, gamma, dt, dx):
+    F = np.zeros(U_prim.shape)
+    U_next = np.zeros(U_prim.shape)
+    F[0, :] = U_prim[0, :]*U_prim[1, :]
+    F[1, :] = U_prim[0, :]*U_prim[1, :]**2 + U_prim[2, :]
+    F[2, :] = U_prim[1, :]*(0.5*U_prim[0, :]*U_prim[1, :]**2 + gamma/(gamma-1)*U_prim[2, :])
+
+    for i in range(1, nx-1):
+        U_next[:, i] = U[:, i] + dt/dx*(F[:, i] - F[:, i-1])
+
+    return U_next
