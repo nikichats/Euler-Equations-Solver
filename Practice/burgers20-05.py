@@ -70,7 +70,7 @@ class Wave:
                     u_minus = self.u_all[n-1, i-1]
                     self.u_all[n, i] = 0.5*(u_plus + u_minus) - 0.25*self.C*(u_plus**2 - u_minus**2)
 
-                    # implicit
+                    # implicit : 0.5*(u_i+1 - u_i-1) - 0.5*dt/dx*(F_i+1 - F_i-1)
                     self.u[i] = 0.5*(self.u[i+1] + self.u[i-1]) - 0.25*self.C*(self.u[i+1]**2 - self.u[i-1]**2)
 
         if scheme == "LaxW":
@@ -81,7 +81,7 @@ class Wave:
                     u_plus = self.u_all[n-1, i+1]
                     u_minus = self.u_all[n-1, i-1]
                     self.u_all[n, i] = u - 0.25*self.C*(u_plus**2 - u_minus**2) + 0.125*self.C*self.C*(((u_plus + u)*(u_plus**2 - u**2))-((u + u_minus)*(u**2 - u_minus**2)))
-                    # implicit
+                    # implicit : u_i - 0.5*dt/dx*(F_i+1 - F_i-1) + 0.5*dt/dx^2*0.5*((ui+ - ui)*(Fi+ - Fi) - (ui - ui-)*(Fi - Fi-))
                     self.u[i] = self.u[i] - 0.25*self.C*(self.u[i+1]**2 - self.u[i-1]**2) + 0.125*self.C*self.C*(((self.u[i+1] + self.u[i])*(self.u[i+1]**2 - self.u[i]**2)) - ((self.u[i]+self.u[i+1])*(self.u[i]**2 - self.u[i-1]**2)))
 
         if scheme == "RichtM":
@@ -112,6 +112,9 @@ class Wave:
                 self.u_all[n, 0] = self.u_all[n, 1]
                 self.u_all[n, self.nx-1] = self.u_all[n, self.nx-2]
 
+        if scheme == "K-Tadmor":
+
+
 def nf(u,v):
     if u == v or (u**2 - v**2)/(u-v) >= 0:
         F = 0.5*u*u
@@ -126,12 +129,10 @@ def plot_all(x, u_all):
         plt.plot(x, u_all[i])
         plt.draw()
 
-w2 = Wave(20, 50, 1)
-w2.profile("top_hat")
-w2.burgers("Godunov")
 
-plot_all(w2.x, w2.u_all)
+w2 = Wave(10, 30, 1.0)      # initialise wave parameters
+w2.profile("test3_tororossothebest")       # assign initial profile
+w2.burgers("Godunov")          # solve using assigned scheme
+
+plot_all(w2.x, w2.u_all)    # plot density, velocity, pressure
 plt.show()
-
-# equation
-# find A matrix

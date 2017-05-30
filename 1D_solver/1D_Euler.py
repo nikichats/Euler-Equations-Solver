@@ -1,8 +1,9 @@
 import numpy as np
-import math as m
 import matplotlib.pyplot as plt
 import copy
+
 import flux
+import initcond
 
 class Wave:
 
@@ -20,99 +21,54 @@ class Wave:
         self.F = np.zeros((3, self.nx))
 
     def init_cond(self, case):
-        """cases represent different jumps in primitive variables"""
+        """Case 0: Sod problem / Case 2"""
+        x_jump = 0.5
         if case == 1:
-            x_jump = 0.5
-            rho_L = 1.0
-            rho_R = 0.125
-            u_L = 0.75
-            u_R = 0.0
-            p_L = 1.0
-            p_R = 0.1
-
-        if case == 2:
-            x_jump = 0.5
-            rho_L = 1.0
-            rho_R = 1.0
-            u_L = -2.0
-            u_R = 2.0
-            p_L = 0.4
-            p_R = 0.4
+            U_0 = initcond.sod()
+        elif case == 2:
+            U_0 = initcond.toro_2()
+        elif case == 3:
+            U_0 = initcond.toro_3()
+        elif case == 4:
+            U_0 = initcond.toro_4()
+        elif case == 5:
+            U_0 = initcond.toro_5()
 
         for i in range(self.nx):
             if i*self.dx < x_jump:
-                self.U_prim[0, i] = rho_L
-                self.U_prim[1, i] = u_L
-                self.U_prim[2, i] = p_L
+                self.U_prim[0, i] = U_0[0]
+                self.U_prim[1, i] = U_0[2]
+                self.U_prim[2, i] = U_0[4]
             else:
-                self.U_prim[0, i] = rho_R
-                self.U_prim[1, i] = u_R
-                self.U_prim[2, i] = p_R
+                self.U_prim[0, i] = U_0[1]
+                self.U_prim[1, i] = U_0[3]
+                self.U_prim[2, i] = U_0[5]
 
-        self.U = variables(self.gamma, self.U_prim)
-
-    # def solve(self, solver):
-    #     if solver == 1:
-    #         for n in range(1, self.nt):
-    #             U = copy.copy(self.U)
-    #             F_plus = flux.LF(self.gamma, U[:, 2:-1])
-    #             F_minus = flux.LF(self.gamma, U[:, 0:-3])
-    #             self.U[:, 1:-2] = 0.5*(self.U[:, 0:-3] + self.U[:, 2:-1]) + 0.5*(F_plus - F_minus)
-    #             self.U[:, 0] = self.U[:, 1]
-    #             self.U[:, self.nx-1] = self.U[:, self.nx-2]
-    #     self.U_prim = primitive(self.gamma, self.U)
+        self.U = flux.variables(self.gamma, self.U_prim)
 
     def solve(self, solver):
-        if solver == 1:
-            plt.figure()
+        plt.figure()
+        plt.plot(self.x, self.U_prim[1])
+        plt.draw()
+
+        for n in range(1, self.nt):
+            self.dt = flux.time_step(self.U_prim, self.nx, self.dx, self.CFL, self.gamma)
+            if solver == 1:
+                U_next = flux.LaxF(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+            elif solver == 2:
+                U_next = flux.LaxW(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+            elif solver == 3:
+                U_next = flux.Godunov(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+
+            U_next = flux.bc(U_next, self.nx, 1)
+            self.U = copy.copy(U_next)
+            self.U_prim = flux.primitive(self.gamma, U_next)
             plt.plot(self.x, self.U_prim[1])
             plt.draw()
-            for n in range(1, self.nt):
-                self.dt = time_step(self.U_prim, self.nx, self.dx, self.CFL, self.gamma)
-                U_next = flux.LaxF(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
-                U_next = bc(U_next, self.nx, 1)
-                self.U = copy.copy(U_next)
-                self.U_prim = primitive(self.gamma, U_next)
-                plt.plot(self.x, self.U_prim[1])
-                plt.draw()
-            plt.show()
+
+        plt.show()
+
         return self.U
-
-def time_step(U_prim, nx, dx, CFL, gamma):
-    u_max = 0.0
-    for i in range(nx):
-        u_loc = abs(U_prim[1, i]) + m.sqrt(abs(gamma*U_prim[2, i]/U_prim[0, i]))
-        if u_loc > u_max:
-            u_max = u_loc
-
-    dt = dx*CFL/u_max
-    return dt
-
-def bc(U, nx, type):
-    """ Type 1 : transmission boundary conditions, Type 2 : periodic"""
-    if type == 2:
-        U[:, 0] = U[:, nx-2]
-        U[:, nx-1] = U[:, 2]
-    else:
-        U[:, 0] = U[:, 1]
-        U[:, nx-1] = U[:, nx-2]
-    return U
-
-def variables(gamma, U_prim):
-    """ Integration variables [ rho, rho*u, 0.5*rho*u^2 + p/(gamma-1)]"""
-    U = np.zeros(U_prim.shape)
-    U[0, :] = U_prim[0, :]
-    U[1, :] = U_prim[0, :]*U_prim[1, :]
-    U[2, :] = 0.5*U_prim[0, :]*(U_prim[1, :]**2) + U_prim[2, :]/(gamma - 1)
-    return U
-
-def primitive(gamma, U):
-    """ Primitive variables [ rho, u, p] """
-    U_prim = np.zeros(U.shape)
-    U_prim[0, :] = U[0, :]
-    U_prim[1, :] = U[1, :]/U[0, :]
-    U_prim[2, :] = (gamma-1)*(U[2, :] - 0.5*(U[1, :]**2)/U[0, :])
-    return U_prim
 
 def plot_all(x, u_all):
     plt.figure()
@@ -120,6 +76,8 @@ def plot_all(x, u_all):
         plt.plot(x, u_all[i])
         plt.draw()
 
-w = Wave(5, 50, -1.0)
-w.init_cond(1)
-w.solve(1)
+w = Wave(20, 50, 1.0)
+w.init_cond(1)              # Toro test cases
+w.solve(3)                  # 1: LaxF, 2: LaxW, 3: Godunov
+plot_all(w.x, w.U)
+plt.show()
