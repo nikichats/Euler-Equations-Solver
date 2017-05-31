@@ -1,7 +1,7 @@
 # Initial conditions for the 1D_Euler.py program. Cases (1)-(5) are from Toro pg. 129
 
 def sod():
-    U_0 = [1.0, 0.125, 0.0, 0.0, 1.0, 0.1]
+    U_0 = [1.0, 0.125, 0.75, 0.0, 1.0, 0.1]
     return U_0
 
 def toro_2():

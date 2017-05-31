@@ -1,24 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+import csv
 
 import flux
 import initcond
 
 class Wave:
 
-    def __init__(self, nt, nx, a):
-        self.nt = nt
+    def __init__(self, time_max, x_max, nx):
         self.nx = nx
-        self.dx = 2.0 / self.nx
-        self.dt = 0.8 * self.dx
+        self.dx = x_max / self.nx
+        self.dt = 0.0
+        self.time_max = time_max
         self.CFL = 0.5
         self.gamma = 1.4
-        self.x = np.linspace(-1, 1, self.nx)
-        self.U_prim = np.zeros((3, self.nx))
-        self.U = np.zeros((3, self.nx))
-        self.U_next = np.zeros((3, self.nx))
-        self.F = np.zeros((3, self.nx))
+        self.x = np.linspace(0, 1, self.nx+1)   # face centered x coordinates
+        self.xc = self.x[:-1] + 0.5*self.dx     # cell centered x coordinates
+        self.U_prim = np.zeros((3, self.nx))    # cell centered
+        self.U = np.zeros((3, self.nx))         # cell centered
+        self.U_next = np.zeros((3, self.nx))    # cell centered
 
     def init_cond(self, case):
         """Case 0: Sod problem / Case 2"""
@@ -35,7 +36,7 @@ class Wave:
             U_0 = initcond.toro_5()
 
         for i in range(self.nx):
-            if i*self.dx < x_jump:
+            if self.xc[i] < x_jump:
                 self.U_prim[0, i] = U_0[0]
                 self.U_prim[1, i] = U_0[2]
                 self.U_prim[2, i] = U_0[4]
@@ -44,40 +45,70 @@ class Wave:
                 self.U_prim[1, i] = U_0[3]
                 self.U_prim[2, i] = U_0[5]
 
-        self.U = flux.variables(self.gamma, self.U_prim)
+        self.U = flux.variables(self.U_prim, self.gamma)
 
     def solve(self, solver):
-        plt.figure()
-        plt.plot(self.x, self.U_prim[1])
-        plt.draw()
+        time = 0.0
+        time_step = 0
+        write(self.xc, self.U_prim, time_step, time)
 
-        for n in range(1, self.nt):
+        while time < self.time_max:
+            ### calculate time step
             self.dt = flux.time_step(self.U_prim, self.nx, self.dx, self.CFL, self.gamma)
+            if self.dt < 10**(-7):
+                break
+            time = time + self.dt
+            time_step = time_step + 1
+
+            ### advance solution
+            U_next = None
             if solver == 1:
-                U_next = flux.LaxF(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
-            elif solver == 2:
-                U_next = flux.LaxW(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
-            elif solver == 3:
                 U_next = flux.Godunov(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+            if solver == 2:
+                U_next = flux.LaxF(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+            if solver == 3:
+                U_next = flux.LaxW(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+            if solver == 4:
+                U_next = flux.basic(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
 
+            ### apply boundary conditions
             U_next = flux.bc(U_next, self.nx, 1)
+
+            ### update variables
             self.U = copy.copy(U_next)
-            self.U_prim = flux.primitive(self.gamma, U_next)
-            plt.plot(self.x, self.U_prim[1])
-            plt.draw()
+            self.U_prim = flux.primitive( U_next, self.gamma)
 
-        plt.show()
+            ### write solution to file
+            write(self.xc, self.U_prim, time_step, time)
 
+        # plt.show()
+        print ("time step = " + str(time_step))
         return self.U
+
+def write(x, U, time_step, time):
+    if time_step%2 == 0:
+        filename = '1D_Euler_' + str(time_step) + '.csv'
+        file = open(filename, 'w')
+        w = csv.writer(file, delimiter=',')
+        w.writerow(('x', 'rho', 'u', 'p'))
+        for i in range(len(x)):
+            w.writerow((x[i], U[0, i], U[1, i], U[2, i]))
+        file.close()
+        return
+    else:
+        return
 
 def plot_all(x, u_all):
     plt.figure()
     for i in range(len(u_all)):
-        plt.plot(x, u_all[i])
+        plt.plot(x, u_all[i], label='variable'+str(i))
         plt.draw()
+    plt.legend()
 
-w = Wave(20, 50, 1.0)
-w.init_cond(1)              # Toro test cases
-w.solve(3)                  # 1: LaxF, 2: LaxW, 3: Godunov
-plot_all(w.x, w.U)
+w = Wave(0.1, 1.0, 50)     # max time, max length, number of spatial steps (nx)
+w.init_cond(1)             # Toro test cases
+# plot_all(w.xc, w.U_prim)
+w.solve(4)                 # 1: Godunov, 2: Lax Friedrichs, 3: Lax Wendroff
+plot_all(w.xc, w.U)
+
 plt.show()
