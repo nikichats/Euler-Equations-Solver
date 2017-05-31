@@ -13,7 +13,7 @@ class Wave:
         self.dx = x_max / self.nx
         self.dt = 0.0
         self.time_max = time_max
-        self.CFL = 0.5
+        self.CFL = 1.0
         self.gamma = 1.4
         self.x = np.linspace(0, 1, self.nx+1)   # face centered x coordinates
         self.xc = self.x[:-1] + 0.5*self.dx     # cell centered x coordinates
@@ -23,7 +23,7 @@ class Wave:
 
     def init_cond(self, case):
         """Case 0: Sod problem / Case 2"""
-        x_jump = 0.5
+        x_jump = 0.3
         if case == 1:
             U_0 = initcond.sod()
         elif case == 2:
@@ -63,13 +63,11 @@ class Wave:
             ### advance solution
             U_next = None
             if solver == 1:
-                U_next = flux.Godunov(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+                U_next = flux.basic(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx, self.CFL)
             if solver == 2:
-                U_next = flux.LaxF(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+                U_next = flux.LaxFriedrich(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx, self.CFL)
             if solver == 3:
-                U_next = flux.LaxW(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
-            if solver == 4:
-                U_next = flux.basic(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx)
+                U_next = flux.MacCormack(self.U, self.U_prim, self.nx, self.gamma, self.dt, self.dx, self.CFL)
 
             ### apply boundary conditions
             U_next = flux.bc(U_next, self.nx, 1)
@@ -86,16 +84,13 @@ class Wave:
         return self.U
 
 def write(x, U, time_step, time):
-    if time_step%2 == 0:
         filename = '1D_Euler_' + str(time_step) + '.csv'
-        file = open(filename, 'w')
+        file = open(filename, 'w', newline='')
         w = csv.writer(file, delimiter=',')
         w.writerow(('x', 'rho', 'u', 'p'))
         for i in range(len(x)):
             w.writerow((x[i], U[0, i], U[1, i], U[2, i]))
         file.close()
-        return
-    else:
         return
 
 def plot_all(x, u_all):
@@ -105,10 +100,8 @@ def plot_all(x, u_all):
         plt.draw()
     plt.legend()
 
-w = Wave(0.1, 1.0, 50)     # max time, max length, number of spatial steps (nx)
+w = Wave(0.2, 1.0, 200)     # max time, max length, number of spatial steps (nx)
 w.init_cond(1)             # Toro test cases
-# plot_all(w.xc, w.U_prim)
-w.solve(4)                 # 1: Godunov, 2: Lax Friedrichs, 3: Lax Wendroff
+w.solve(3)                 # 1: basic, 2: Lax Friedrichs, 3: example_code
 plot_all(w.xc, w.U)
-
 plt.show()
