@@ -34,7 +34,7 @@ shock_position = 0.5
 ### Solve
 time = 0.0
 time_step = 0
-f.write(x, density, momentum, energy, time_step, solver)
+f.write(x, density, momentum, energy, time_step, solver, gamma)
 
 while time < time_max:
     # time stepping
@@ -51,7 +51,7 @@ while time < time_max:
     elif solver == 3:
         [density_new, momentum_new, energy_new] = flux.MacCormack(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
     elif solver == 4:
-        [density_new, momentum_new, energy_new] = flux.RichtMyer2(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
+        [density_new, momentum_new, energy_new] = flux.RichtMyer(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
     else:
         [density_new, momentum_new, energy_new] = flux.basic(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
 
@@ -67,7 +67,7 @@ while time < time_max:
     velocity = momentum / density
     pressure = (gamma - 1) * (energy - 0.5 * (momentum**2) / density)
 
-    f.write(x, density, momentum, energy, time_step, solver)
+    f.write(x, density, momentum, energy, time_step, solver, gamma)
 
 print("final time step = " + str(time_step))
 

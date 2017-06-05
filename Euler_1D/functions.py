@@ -23,7 +23,7 @@ def boundary_conditions(quantity, ghost_nx, nx):
     return quantity
 
 
-def write(x, density, momentum, energy, time_step, solver):
+def write(x, density, momentum, energy, time_step, solver, gamma):
     if solver == 1:
         filename = 'Euler_1D_basic_' + str(time_step) + '.csv'
     elif solver == 2:
@@ -36,9 +36,11 @@ def write(x, density, momentum, energy, time_step, solver):
         filename = 'Euler_1D_' + str(time_step) + '.csv'
     file = open(filename, 'w')
     w = csv.writer(file, delimiter=',')
-    w.writerow(('x', 'density', 'momentum', 'energy'))
+    w.writerow(('x', 'density', 'momentum', 'energy', 'pressure', 'sound speed'))
     for i in range(len(x)-1):
-        w.writerow((x[i], density[i], momentum[i], energy[i]))
+        pressure = ( energy[i] - 0.5*momentum[i]**2/density[i] ) * (gamma - 1)
+        sound_speed = m.sqrt(gamma * pressure / density[i])
+        w.writerow((x[i], density[i], momentum[i], energy[i], pressure, sound_speed))
     file.close()
     return
 
