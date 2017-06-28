@@ -3,7 +3,6 @@ import numpy as np
 import initial_conds as ic
 import functions as f
 import flux
-import riemann
 
 domain_nx = 50
 ghost_nx = 2
@@ -12,21 +11,20 @@ x_min = -10.
 x_max = 10.
 dx = (x_max - x_min) / domain_nx
 
-x = np.linspace(x_min - ghost_nx * dx, x_max + ghost_nx * dx, nx + 1)
+x = np.linspace(x_min - ghost_nx * dx, x_max + ghost_nx * dx, nx )
 
-time_max = 0.01
 CFL = 0.4
 gamma = 1.4
 
-solver = 2
+solver = 5
 epsilon_artificial_viscosity = 0.0
 
 # Initial Conditions
-[rho_l, rho_r, u_l, u_r, p_l, p_r, cs_l, cs_r] = ic.left_right_states(gamma, test=1)
-[density, momentum, energy, velocity, pressure] = ic.initial_cond(x, rho_l, rho_r, u_l, u_r, p_l, p_r, gamma, nx, shock_position=0.0)
+time_max = ic.time_out(test=1)
+[rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r] = ic.left_right_states(gamma, test=1)
+[density, momentum, energy, velocity, pressure] = ic.initial_cond(x, rho_l, rho_r, u_l, u_r, p_l, p_r, gamma, nx , shock_position=0.0)
 
-time = 0.0
-time_step = 0
+time = 0.0; time_step = 0
 f.write(x, density, momentum, energy, time_step, solver, gamma, CFL, epsilon_artificial_viscosity)
 
 # Solve
@@ -52,8 +50,6 @@ while time < time_max:
         [density_new, momentum_new, energy_new] = flux.MacCormack(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
     elif solver == 4:
         [density_new, momentum_new, energy_new] = flux.RichtMyer(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
-    elif solver == 5:
-        [density_new, momentum_new, energy_new] = riemann.piecewise_linear(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
     else:
         [density_new, momentum_new, energy_new] = flux.basic(density, momentum, energy, ghost_nx, nx, gamma, dt, dx)
 
@@ -71,3 +67,13 @@ while time < time_max:
     f.write(x, density, momentum, energy, time_step, solver, gamma, CFL, epsilon_artificial_viscosity)
 
 print("final time step = " + str(time_step))
+
+import matplotlib.pyplot as plt
+plt.figure()
+plt.plot(x, density, 'k')
+plt.figure()
+plt.plot(x, momentum, 'b')
+plt.figure()
+plt.plot(x, energy, 'r')
+
+plt.show()

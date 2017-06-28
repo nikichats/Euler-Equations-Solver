@@ -80,7 +80,7 @@ def fan_states(S, rho_lr, u_lr, p_lr, a_lr, gamma):
     return rho_fan, u_fan, p_fan
 
 
-def shock_speeds(p_star, u_star, p_l, p_r, rho_l, rho_r, a_l, a_r, gamma):
+def shock_speeds(p_star, u_star, rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r, gamma):
     S_l = S_r = S_h_l = S_h_r = S_t_l = S_t_r = 0.0
 
     gamma_2p = (gamma + 1) / (2. * gamma)
@@ -103,49 +103,62 @@ def shock_speeds(p_star, u_star, p_l, p_r, rho_l, rho_r, a_l, a_r, gamma):
     return S_l , S_r , S_h_l , S_h_r , S_t_l , S_t_r
 
 
-def sample(x, t, rho_l, rho_r, p_l, p_r, u_l, u_r, a_l, a_r, gamma):
-    """ For input values of x and t, return the state variables depending on input variables"""
+def sample(x, t, rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r, gamma):
+    """
+    For input values of x and t, return the state variables depending on input variables
+    """
+
     S = x/t
     [rho_star_l, rho_star_r, u_star, p_star] = star_states(rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r, gamma)
     [rho_fan_l, u_fan_l, p_fan_l] = fan_states(S, rho_l, u_l, p_l, a_l, gamma)
     [rho_fan_r, u_fan_r, p_fan_r] = fan_states(S, rho_r, u_r, p_r, -a_r, gamma) # note the - a_r
-    [S_l , S_r , S_h_l , S_h_r , S_t_l , S_t_r] = shock_speeds(p_star, u_star, p_l, p_r, rho_l, rho_r, a_l, a_r, gamma)
+    [S_l , S_r , S_h_l , S_h_r , S_t_l , S_t_r] = shock_speeds(p_star, u_star, rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r, gamma)
 
-    if S < u_star:
+    if S <= u_star:
         if p_star > p_l:
-            if S < S_l:         # left state (shock)
+            if S <= S_l:         # left state (shock)
+                # 1
                 W = np.array([rho_l, u_l, p_l])
 
             else:               # left star state (shock)
+                # 2
                 W = np.array([rho_star_l, u_star, p_star])
 
         else:
-            if S < S_h_l:       # left state (fan)
+            if S <= S_h_l:       # left state (fan)
+                # 3
                 W = np.array([rho_l, u_l, p_l])
 
             else:
                 if S > S_t_l:   # left state (fan)
+                    # 4
                     W = np.array([rho_star_l, u_star, p_star])
 
                 else:           # left fan state (fan)
+                    # 5
                     W = np.array([rho_fan_l, u_fan_l, p_fan_l])
     else:
         if p_star > p_r:
-            if S > S_r:         # right state (shock)
+            if S >= S_r:         # right state (shock)
+                # 6
                 W = np.array([rho_r, u_r, p_r])
 
             else:               # right star state (shock)
+                # 7
                 W = np.array([rho_star_r, u_star, p_star])
 
         else:
-            if S > S_h_r:       # right state (fan)
+            if S >= S_h_r:       # right state (fan)
+                # 8
                 W = np.array([rho_r, u_r, p_r])
 
             else:
-                if S < S_t_r:   # right star state (fan)
+                if S <= S_t_r:   # right star state (fan)
+                    # 9
                     W = np.array([rho_star_r, u_star, p_star])
 
                 else:           # right fan state (fan)
+                    # 10
                     W = np.array([rho_fan_r, u_fan_r, p_fan_r])
 
     rho_state = W[0]
@@ -155,37 +168,54 @@ def sample(x, t, rho_l, rho_r, p_l, p_r, u_l, u_r, a_l, a_r, gamma):
     return rho_state, u_state, p_state
 
 ##############################################################################
+############################ ANALYTIC SOLUTION ###############################
+##############################################################################
 
-TEST = 5
-gamma = 1.4
-[rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r] = ic.left_right_states(gamma, TEST)
-t_out = ic.time_out(TEST)
 
-domain_nx = 100
-ghost_nx = 2
-nx = domain_nx + 2*ghost_nx
-x_min = 0.
-x_max = 1.
-dx = (x_max - x_min) / domain_nx
-shock_position = 0.5 * (x_max + x_min)
+def analytic_solution(riemann_analytic, plot_analytic, TEST):
+    if riemann_analytic == True:
+        gamma = 1.4
+        [x_0, rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r] = ic.left_right_states(gamma, TEST)
+        t_out = ic.time_out(TEST)
 
-x = np.linspace(x_min - ghost_nx * dx, x_max + ghost_nx * dx, nx + 1)
-rho = np.zeros(nx + 1)
-u = np.zeros(nx + 1)
-p = np.zeros(nx + 1)
+        domain_nx = 50
+        ghost_nx = 2
+        nx = domain_nx + 2*ghost_nx
+        x_min = 0.
+        x_max = 1.
+        dx = (x_max - x_min) / domain_nx
+        shock_position = x_0 * (x_max + x_min) + x_min
 
-for i in range(ghost_nx, nx - ghost_nx):
-    [rho_i, u_i, p_i] = sample(x[i] - shock_position, t_out, rho_l, rho_r, p_l, p_r, u_l, u_r, a_l, a_r, gamma)
-    rho[i] = rho_i
-    u[i] = u_i
-    p[i] = p_i
+        x = np.linspace(x_min - ghost_nx * dx, x_max + ghost_nx * dx, nx + 1)
+        rho = np.zeros(nx + 1)
+        u = np.zeros(nx + 1)
+        p = np.zeros(nx + 1)
 
-stars = star_states(rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r, gamma)
-print(stars)
+        for i in range(ghost_nx, nx - ghost_nx):
+            [rho_i, u_i, p_i] = sample(x[i] - shock_position, t_out, rho_l, rho_r, u_l, u_r, p_l, p_r, a_l, a_r, gamma)
+            rho[i] = rho_i
+            u[i] = u_i
+            p[i] = p_i
 
-rho = f.boundary_conditions(rho, ghost_nx, nx)
-u = f.boundary_conditions(u, ghost_nx, nx)
-p = f.boundary_conditions(p, ghost_nx, nx)
+        rho = f.boundary_conditions(rho, ghost_nx, nx)
+        u = f.boundary_conditions(u, ghost_nx, nx)
+        p = f.boundary_conditions(p, ghost_nx, nx)
+        mom = rho * u
+        E = p/(gamma - 1) + 0.5 * rho * u * u
 
-plt.plot(x, rho, 'k', x, u, 'b')
-plt.show()
+        if plot_analytic == True:
+            fr, axarr = plt.subplots(2, 2)
+            axarr[0, 0].plot(x[:-1], rho[:-1], 'k')
+            axarr[0, 0].set_title('Density')
+            axarr[0, 1].plot(x[:-1], u[:-1], 'b')
+            axarr[0, 1].set_title('Velocity')
+            axarr[1, 0].plot(x[:-1], p[:-1], 'r')
+            axarr[1, 0].set_title('Pressure')
+            axarr[1, 1].plot(x[:-1], E[:-1], 'g')
+            axarr[1, 1].set_title('Energy')
+            fr.subplots_adjust(hspace=0.5)
+            plt.show()
+
+        return x, rho, u, p, mom, E
+
+# analytic_solution(riemann_analytic=True, plot_analytic=True, TEST=1)
