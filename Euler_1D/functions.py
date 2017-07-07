@@ -24,6 +24,69 @@ def time_step(density, momentum, energy, ghost_nx, nx, dx, CFL, gamma):
     return dt
 
 
+def convert_to_base(number, base):
+    number_base_rep = []
+    decimal_base_rep = []
+    integer = int(number)
+    decimal = abs(number - integer)
+
+    if decimal == 0:
+        decimal_base_rep.append(0)
+    else:
+        # while decimal != 0 or integer != 0:
+        for i in range(40):
+            decimal = base * decimal
+            integer = int(decimal)
+            decimal = abs(decimal - integer)
+            decimal_base_rep.append(integer)
+        decimal_base_rep = (decimal_base_rep[:-1])
+
+    integer = int(number)
+    if integer == 0:
+        number_base_rep.insert(0, 0)
+    else:
+        while integer != 0:
+            integer, remainder = divmod(integer, base)
+            number_base_rep.append(remainder)
+        number_base_rep = number_base_rep[:-1]
+
+    return(number_base_rep, decimal_base_rep)
+
+
+def convert_to_full(int_seq, dec_seq, base):
+    a = 0.0
+    l = len(int_seq)
+    for i in range(l):
+        j = l - 1 - i
+        a += int_seq[j] * (base**i)
+
+    l = len(dec_seq)
+    for i in range(1,l+1):
+        a += (dec_seq[i-1] * (base**(-i)))
+
+    return(a)
+
+
+def theta_vdc(k1, k2, n):
+    for i in range(1, n+1):
+        [int_seq, dec_seq] = convert_to_base(float(i/n), k1)
+        a = convert_to_full(int_seq, dec_seq, k1)
+        print(a)
+
+
+def theta_numerica(k1, k2, n):
+    theta = 0.0
+    nn = 10.0
+    i = 0
+    while nn >= 1:
+        l = nn%k1
+        j = (k2*l)%k1
+        theta += j/(k1**(i+1))
+        i += 1
+
+    print(theta)
+
+
 def boundary_conditions(quantity, ghost_nx, nx):
     for i in range(0, ghost_nx):
         quantity[ghost_nx-1-i] = quantity[ghost_nx]
@@ -51,6 +114,31 @@ def return_conserved(density, velocity, pressure, gamma):
     energy = (pressure / (gamma - 1)) + 0.5 * density * velocity**2
 
     return density, momentum, energy
+
+
+def min_mod2(x, y):
+    def MM(a, b):
+        if a*b  < 0 :
+            return 0
+        elif abs(a) < abs(b):
+            return a
+        else:
+            return b
+
+    return np.array([MM(x[j], y[j]) for j in range(len(x))])
+
+
+def min_mod3(x, y, z):
+
+    def MM(a, b, c):
+        mm = float((1./3.) * (np.sign(a) + np.sign(b) + np.sign(c)) * min(abs(a), min(abs(b), abs(c))))
+        return mm
+
+    if np.size(x) == 1 and np.size(y) == 1:
+        return MM(x, y, z)
+    else:
+        assert(len(x) == len(y))
+        return np.array([MM(x[j], y[j], z[j]) for j in range(len(x))])
 
 
 def write(x, density, momentum, energy, time_step, solver, gamma, CFL, epsilon_artificial_viscosity):
@@ -81,29 +169,25 @@ def write(x, density, momentum, energy, time_step, solver, gamma, CFL, epsilon_a
 def plot_all(x, density, velocity, pressure, momentum, energy, x_analytic, density_analytic, velocity_analytic,
              pressure_analytic, momentum_analytic, energy_analytic, gamma):
 
-    mach_number = velocity / sound_speed(density, momentum, energy, gamma)
-    mach_number_analytic = velocity_analytic / sound_speed(density_analytic, momentum_analytic, energy_analytic, gamma)
+    # mach_number = velocity / sound_speed(density, momentum, energy, gamma)
+    # mach_number_analytic = velocity_analytic / sound_speed(density_analytic, momentum_analytic, energy_analytic, gamma)
 
     fr, axarr = plt.subplots(2, 2)
-    # fr, axarr = plt.subplots(3, 2)
 
-    axarr[0, 0].plot(x_analytic, density_analytic, 'k', x, density, 'ko', markersize=2)
+    axarr[0, 0].plot(x_analytic, density_analytic, 'k', x, density, 'ko-', markersize=2)
     axarr[0, 0].set_title('Density')
 
-    axarr[0, 1].plot(x_analytic, pressure_analytic, 'b', x, pressure, 'ko', markersize=2)
+    axarr[0, 1].plot(x_analytic, pressure_analytic, 'b', x, pressure, 'ko-', markersize=2)
     axarr[0, 1].set_title('Pressure')
 
-    axarr[1, 0].plot(x_analytic, momentum_analytic, 'g', x, momentum, 'ko', markersize=2)
-    axarr[1, 0].set_title('Momentum')
+    axarr[1, 0].plot(x_analytic, velocity_analytic, 'g', x, velocity, 'ko-', markersize=2)
+    axarr[1, 0].set_title('Velocity')
 
-    axarr[1, 1].plot(x_analytic, energy_analytic, 'c', x, energy, 'ko', markersize=2)
+    # axarr[1, 0].plot(x_analytic, mach_number_analytic, 'r', x, mach_number, 'ko', markersize=2)
+    # axarr[1, 0].set_title('Mach Number')
+
+    axarr[1, 1].plot(x_analytic, energy_analytic, 'c', x, energy, 'ko-', markersize=2)
     axarr[1, 1].set_title('Energy')
-
-    # axarr[2, 0].plot(x_analytic, velocity_analytic, 'm', x, velocity, 'ko', markersize=2)
-    # axarr[2, 0].set_title('Velocity')
-    #
-    # axarr[2, 1].plot(x_analytic, mach_number_analytic, 'r', x, mach_number, 'ko', markersize=2)
-    # axarr[2, 1].set_title('Mach Number')
 
     fr.subplots_adjust(hspace=0.5)
     plt.show()

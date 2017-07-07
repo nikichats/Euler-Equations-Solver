@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import initial_conds as ic
 import functions as f
+import reconstruction as r
 import flux
 import riemann
 
@@ -19,14 +20,14 @@ x_max = 1.
 dx = (x_max - x_min) / domain_nx
 shock_position = x_0 * (x_max + x_min) + x_min
 
-x = np.linspace(x_min - ghost_nx * dx, x_max + ghost_nx * dx, nx + 1)
-[density, momentum, energy, velocity, pressure] = ic.initial_cond(x, rho_l, rho_r, u_l, u_r, p_l, p_r, gamma, nx + 1, shock_position)
+x = np.linspace(x_min - ghost_nx * dx, x_max + ghost_nx * dx, nx)
+[density, momentum, energy, velocity, pressure] = ic.initial_cond(x, rho_l, rho_r, u_l, u_r, p_l, p_r, gamma, nx , shock_position)
 sound_speed = np.zeros(nx + 1)
 length = nx + 1
 
 time = 0.0
 time_step = 0
-f.write(x, density, momentum, energy, time_step, 5, gamma, CFL, 0.0)
+# f.write(x, density, momentum, energy, time_step, 5, gamma, CFL, 0.0)
 
 while time < t_out:
     # CALCULATE TIME STEP
@@ -50,16 +51,22 @@ while time < t_out:
     for i in range(ghost_nx, nx - ghost_nx):
         j = i - ghost_nx
 
-        # SAMPLE RIEMANN PROBLEM AT LEFT AND RIGHT INTERFACES
-        [rho_left, u_left, p_left] = riemann.sample(0.0, dt, density[i - 1], density[i], velocity[i - 1], velocity[i],
-                                                    pressure[i - 1], pressure[i], sound_speed[i - 1], sound_speed[i],
-                                                    gamma)
+        # RECONSTRUCTION
+        density_left_l, density_left_r, density_right_l, density_right_r = r.reconstruction(density, i).constant()
+        velocity_left_l, velocity_left_r, velocity_right_l, velocity_right_r = r.reconstruction(velocity, i).constant()
+        pressure_left_l, pressure_left_r, pressure_right_l, pressure_right_r = r.reconstruction(pressure, i).constant()
+        sound_speed_left_l, sound_speed_left_r, sound_speed_right_l, sound_speed_right_r = r.reconstruction(sound_speed, i).constant()
 
-        [rho_right, u_right, p_right] = riemann.sample(0.0, dt, density[i], density[i + 1], velocity[i],
-                                                       velocity[i + 1], pressure[i], pressure[i + 1], sound_speed[i],
-                                                       sound_speed[i + 1], gamma)
+        # INTERFACE QUANTITIES
+        [rho_left, u_left, p_left] = riemann.sample(0.0, dt, density_left_l, density_left_r, velocity_left_l,
+                                                    velocity_left_r, pressure_left_l, pressure_left_r,
+                                                    sound_speed_left_l, sound_speed_left_r, gamma)
 
-        # CALCULATE FLUXES OF CONSERVED QUANTITIES
+        [rho_right, u_right, p_right] = riemann.sample(0.0, dt, density_right_l, density_right_r, velocity_right_l,
+                                                       velocity_right_r, pressure_right_l, pressure_right_r,
+                                                       sound_speed_right_l, sound_speed_right_r, gamma)
+
+        # FLUXES OF CONSERVED INTERFACE QUANTITIES
         [rho_left, mom_left, en_left] = f.return_conserved(rho_left, u_left, p_left, gamma)
         [rho_right, mom_right, en_right] = f.return_conserved(rho_right, u_right, p_right, gamma)
 
@@ -79,7 +86,7 @@ while time < t_out:
     # CONSERVED TO PHYSICAL QUANTITIES
     [density, velocity, pressure] = f.return_primitive(density, momentum, energy, gamma)
 
-    f.write(x, density, momentum, energy, time_step, 5, gamma, CFL, 0.0)
+    # f.write(x, density, momentum, energy, time_step, 5, gamma, CFL, 0.0)
 
 # OBTAIN ANALYTIC SOLUTION
 [x_analytic, density_analytic, velocity_analytic, pressure_analytic, momentum_analytic, energy_analytic] = \
